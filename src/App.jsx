@@ -1,13 +1,15 @@
-// npm install lucide-react firebase
+// npm install lucide-react recharts firebase
 
-// ============================================================
-// Firebase 設定（後で本番の値に書き換えてください）
-// ============================================================
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import { useState, useEffect, useCallback } from "react";
-import { BookOpen, CheckCircle, XCircle, Flag, RotateCcw, Home, ChevronRight, List, User } from "lucide-react";
+import React, { useState, useEffect, useCallback } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { Check, X, Home, ChevronRight, AlertCircle, Save, RotateCcw, Play, List, CheckSquare } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
+// ==========================================
+// 1. Firebase Configuration & App Settings
+// ==========================================
+// TODO: 以下のダミー値を本番環境のFirebase設定に書き換えてください。
 const firebaseConfig = {
   apiKey: "AIzaSyCyo4bAZwqaN2V0g91DehS6mHmjZD5XJTc",
   authDomain: "sabu-hide-web-app.firebaseapp.com",
@@ -18,942 +20,919 @@ const firebaseConfig = {
   measurementId: "G-XSS72H1ZKV"
 };
 
-// アプリごとに固有のID（他の問題集と混ざらないよう変更してください）
+// Firebase初期化 (try-catchでエラー回避)
+let db = null;
+try {
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  console.log("Firebase initialized successfully.");
+} catch (error) {
+  console.error("Firebase initialization failed:", error);
+}
+
+// アプリケーションごとに一意のIDを設定（他の問題集と混ざらないようにするため）
 const APP_ID = "financial-quiz-4-6";
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// ============================================================
-// 問題データ
-// ============================================================
-const ALL_QUESTIONS = [
+// ==========================================
+// 2. Quiz Data (全16問完全収録)
+// ==========================================
+const quizData = [
   {
     id: 1,
     title: "情報システム開発の流れ",
     question: "情報システムの開発プロセスに関して、次のa～cの順序として、最も適切なものを下記の解答群から選べ。\n\na　情報システム導入に必要な要員や費用の見積り\nb　プログラムの機能や処理内容の設計\nc　ユーザ・インターフェースの設計",
-    choices: [
-      "a → b → c",
-      "a → c → b",
-      "b → c → a",
-      "c → a → b",
-    ],
-    answer: 1,
-    explanation: `正解：イ　a → c → b
-
-aの「情報システム導入に必要な要員や費用の見積り」は、「基本計画」で行われます。bの「プログラムの機能や処理内容の設計」は「内部設計」で行われます。cの「ユーザ・インターフェースの設計」は「外部設計」で行われます。外部設計→内部設計の順に行われるので、a→c→bとなります。
-
-【重要ポイント】
-情報システム開発の基本的な流れ：基本計画 → 設計（外部設計→内部設計）→ 開発 → テスト → 運用・保守
-
-●基本計画：情報システムの基本的な計画を作成する段階。要件定義などを行う。
-●外部設計：利用者から見た仕様を設計（ユーザ・インターフェース、データベース設計など）。
-●内部設計：プログラムの内部の仕様を設計（機能・処理内容の設計）。
-●開発：設計書を基にデータベースやプログラムを開発。
-●テスト：プログラムが仕様どおりに動作するかをテスト。
-●運用・保守：定期的なバックアップ、利用者からの問合せ対応など。`,
+    options: ["a → b → c", "a → c → b", "b → c → a", "c → a → b"],
+    answerIndex: 1,
+    explanation: {
+      summary: "本問では情報システムの開発プロセスについて問われています。\n情報システム開発の基本的な流れは、 基本計画、設計、開発、テスト、運用･保守の手順 となります。",
+      details: "正解：イ　a → c → b\n\naの「情報システム導入に必要な要員や費用の見積り」は、情報システムの開発プロセスの「基本計画」で行われます。bの「プログラムの機能や処理内容の設計」は、プログラム内部の仕様を設計することですから、「内部設計」で行われます。cの「ユーザ・インターフェースの設計」は、「外部設計」で行われます。なお、「外部設計」では、データベースの設計なども含まれます。基本的な流れとしては、外部設計→内部設計の順に行われますので、a→c→bの順序で実施されます。",
+      table: [
+        { title: "基本計画", desc: "情報システムの基本的な計画を作成する段階であり、情報システムを企画する工程です。情報システムの要件を明確にする 要件定義 などを行います。" },
+        { title: "設計", desc: "設計では、基本計画で定義した要件に基づき、情報システムの機能を設計します。設計は、「 外部設計 」と「 内部設計 」に分けられます。外部設計では、利用者から見た仕様を設計します。内部設計では、プログラムの内部の仕様を設計します。" },
+        { title: "開発", desc: "設計で作成した各種の設計書を基に、データベースや各種のプログラムなどを開発していきます。" },
+        { title: "テスト", desc: "開発で作成したプログラムなどが、仕様どおりに動作するかをテストします。" },
+        { title: "運用・保守", desc: "定期的なバックアップ、利用者からの問合せ対応などを行います。" }
+      ]
+    }
   },
   {
     id: 2,
     title: "情報システムの開発手法",
     question: "情報システムの開発手法に関する記述として、最も適切なものはどれか。",
-    choices: [
+    options: [
       "ウォーターフォール型のシステム開発では、システムの機能や構造を決める内部設計が行われた後に、ユーザ・インターフェースなどを決める外部設計が行われる。",
       "RADは、ウォーターフォール型のシステム開発プロセスを、より短期間で実施できることを目的とした手法である。",
       "スパイラル型のシステム開発では、システムの部分単位に開発プロセスを繰り返しながら、徐々にシステムの完成度を高めていく。",
-      "プロトタイピングでは、プロトタイプが問題ないことをユーザに確認してもらえば、その後に開発する本格的なシステムは問題なく稼働する。",
+      "プロトタイピングでは、プロトタイプが問題ないことをユーザに確認してもらえば、その後に開発する本格的なシステムは問題なく稼働する。"
     ],
-    answer: 2,
-    explanation: `正解：ウ
-
-ア×：ウォーターフォール型では、外部設計を行ってから内部設計が行われます。
-
-イ×：RAD（Rapid Application Development）は、プロトタイプ型と同じく試作品を作って開発を進める手法です。プロトタイプを完成イメージに近付けるため、製作と評価を繰り返しながら開発が進められます。
-
-ウ○：正しい記述です。スパイラル型の説明として正確です。
-
-エ×：プロトタイピング（プロトタイプ型）は、プロトタイプが問題ないことをユーザに確認してもらいますが、その後に本格的なシステムを開発するプロセスではテストを行います。
-
-【重要ポイント】
-●ウォーターフォール型：上流工程から順番に実施（基本計画→設計→開発→テスト→運用）
-●プロトタイプ型：早い段階でプロトタイプ（試作品）を作成し、ユーザが確認してから本格開発
-●スパイラル型：設計・開発・テストを何度も繰り返して徐々にシステムを成長させる`,
+    answerIndex: 2,
+    explanation: {
+      summary: "本問では情報システムの開発手法について問われています。\n情報システムの開発手法を、開発の手順で大きく分類すると、ウォーターフォール型、プロトタイプ型、スパイラル型の開発手法があります。",
+      details: "正解：ウ\n\nア ×：ウォーターフォール型では、外部設計を行ってから、内部設計が行われます。\nイ ×：RAD（Rapid Application Development）は、プロトタイプ型と同じく試作品を作って開発を進める手法です。プロトタイプを完成イメージに近付けるため、製作と評価を繰り返しながら開発が進められます。\nウ ○：スパイラル型の説明に関する、正しい記述です。\nエ ×：プロトタイピング（プロトタイプ型）は、プロトタイプが問題ないことをユーザに確認してもらいますが、その後に本格的なシステムを開発するプロセスではテストを行います。",
+      customRender: () => (
+        <div className="mt-4 space-y-4 text-sm">
+          <div className="border p-2 bg-blue-50">
+            <strong>ウォーターフォール型:</strong> 上流工程から順番に実施していく方法です。<br/>
+            <span className="text-gray-600">基本計画 → 外部設計 → 内部設計 → 開発 → テスト → 運用保守</span>
+          </div>
+          <div className="border p-2 bg-orange-50">
+            <strong>プロトタイプ型:</strong> プロジェクトの早い段階でプロトタイプ（試作品）を作成し、ユーザが確認してから本格的に開発する方法です。
+          </div>
+          <div className="border p-2 bg-green-50">
+            <strong>スパイラル型:</strong> 設計、開発、テストという手順を何度もくり返すことで、徐々にシステムを成長させていく開発手法です。
+          </div>
+        </div>
+      )
+    }
   },
   {
     id: 3,
     title: "PMBOK",
-    question: "プロジェクト管理の知識体系であるPMBOK（第7版まで）に関する記述として、最も不適切なものはどれか。",
-    choices: [
+    question: "プロジェクト管理の知識体系であるPMBOK（第７版まで）に関する記述として、最も不適切なものはどれか。",
+    options: [
       "PMBOKは、情報システム以外のプロジェクトにも対応している。",
       "PMBOKでは、プロジェクトマネジメントの12の原理・原則、プロジェクトマネジメントの10の知識エリアが定義されている。",
       "PMBOKは、米国プロジェクトマネジメント協会（PMI）が策定・改定している。",
-      "WBSは、成果物を得るために必要な工程や作業について記述する。",
+      "WBSは、成果物を得るために必要な工程や作業について記述する。"
     ],
-    answer: 1,
-    explanation: `正解：イ（最も不適切）
-
-ア○：正しい記述です。PMBOKは情報システムに限らず、プロジェクトマネジメントの遂行に必要な基本的な知識を汎用的な形で体系立てて整理したものです。
-
-イ×（不適切）：PMBOK第7版では、「10の知識エリア」という概念がなくなり、「8のパフォーマンス・ドメイン」という概念が登場しました。
-
-ウ○：正しい記述です。なお、PMIではPMBOKに準拠した国際的な認定制度「PMP」（Project Management Professional）を展開しています。
-
-エ○：PMBOKのスコープマネジメントにて、WBS（Work Breakdown Structure）が取り上げられています。WBSとは、プロジェクトの全ての作業を階層構造で表したものです。
-
-【重要ポイント】
-PMBOK（Project Management Body of Knowledge）：プロジェクト管理の方法を体系的にまとめたもの。
-第7版（2021年発表）：12の原理・原則 ＋ 8のパフォーマンス・ドメイン（「10の知識エリア」から変更）`,
+    answerIndex: 1,
+    explanation: {
+      summary: "本問ではPMBOKについて問われています。\nPMBOK （Project Management Body of Knowledge）は、プロジェクト管理の方法を体系的にまとめたものであり、プロジェクト管理の知識に関する国際標準と位置づけられます。",
+      details: "正解：イ\n\nア ○：PMBOKは、情報システムに限らず、プロジェクトマネジメントの遂行に必要な基本的な知識を汎用的な形で体系立てて整理したものです。\nイ ×：PMBOK第7版では、「10の知識エリア」という概念がなくなり、「8のパフォーマンス・ドメイン」という概念が登場しました。\nウ ○：米国プロジェクトマネジメント協会（PMI）では、PMBOKに準拠した国際的な認定制度「PMP」(Project Management Professional)を展開しています。\nエ ○：PMBOKのスコープマネジメントにて、WBSが取り上げられています。WBS（Work Breakdown Structure）とは、プロジェクトの全ての作業を階層構造で表したものです。",
+      customRender: () => (
+        <div className="mt-4 border p-3 bg-gray-50 text-sm">
+          <strong>PMBOK第7版の8つのパフォーマンス・ドメイン:</strong><br/>
+          ステークホルダー / チーム / 開発アプローチとライフサイクル / 計画 / プロジェクト作業 / デリバリー / パフォーマンスの測定 / 不確実性
+        </div>
+      )
+    }
   },
   {
     id: 4,
     title: "EVMS",
     question: "システム開発プロジェクトの管理に使われるEVMSに関する記述として、最も不適切なものはどれか。",
-    choices: [
+    options: [
       "EVMSでは、プロジェクトの全ての作業を金銭価値に置きなおし、プロジェクトの進捗において、作業の進捗度を金額で表現することで管理する。",
       "EVMSを用いると、進捗状況が明確になるが、計画変更の管理が煩雑になりやすいという問題がある。",
       "EVMSでは、アーンドバリューとベースラインを比較することで、進捗度合いを定量的に把握する。",
-      "EVMSは、小規模なプロジェクトでの適用には向いているが、大規模プロジェクトには向かない。",
+      "EVMSは、小規模なプロジェクトでの適用には向いているが、大規模プロジェクトには向かない。"
     ],
-    answer: 3,
-    explanation: `正解：エ（最も不適切）
-
-ア○：正しい記述です。EVMSは、作業の工数を金額に換算する点が特徴です。
-
-イ○：EVMSでは、計画変更があった場合、再度、金額に換算する必要があることなどから、計画変更時の管理は煩雑になります。
-
-ウ○：アーンドバリューとは作業の進捗を金額で表したもの、ベースラインとは作業の見積もりを金額に換算して計算したものです。
-
-エ×（不適切）：EVMSは、厳密に管理できる一方で、管理のための手間がかかることから、小規模プロジェクトよりもむしろ大規模プロジェクトに向いています。
-
-【重要ポイント】
-EVMS（Earned Value Management System：出来高管理システム）
-・作業の進捗度を金額で表現することで管理する手法
-・ベースライン：プロジェクト計画の各作業を金額に換算したもの
-・アーンドバリュー：実際の作業進捗を金額で表したもの
-・大規模プロジェクトに向いている`,
+    answerIndex: 3,
+    explanation: {
+      summary: "本問ではEVMSについて問われています。\nEVMS （Earned Value Management System：出来高管理システム）とは、プロジェクトの進捗管理をする方法であり、作業の進捗度を金額で表現することで管理します。",
+      details: "正解：エ\n\nア ○：EVMSは、作業の工数を金額に換算する点が特徴です。\nイ ○：進捗状況を定量的に把握できますが、計画変更があった場合、再度金額に換算する必要があるため管理は煩雑になります。\nウ ○：アーンドバリューとは作業の進捗を金額で表したもの、ベースラインとは作業の見積もりを金額に換算して計算したものです。\nエ ×：EVMSは厳密に管理できる一方で、管理のための手間がかかることから、小規模プロジェクトよりもむしろ大規模プロジェクトに向いています。"
+    }
   },
   {
     id: 5,
     title: "要件定義",
     question: "情報システムの要件定義に関する記述として、最も不適切なものはどれか。",
-    choices: [
+    options: [
       "要件定義では、システムの仕様およびシステム化の範囲と機能を明確にし、利害関係者間で合意する。",
       "数値化していない要件は、それを満たしているか否かの判断基準が人によって異なるため、数値化すべきである。",
       "要件は漏れなく明確化する必要があるため、未確定な部分があるときは決定を先送りすべきである。",
-      "要件定義では、システム利用者のニーズの整理を行う。",
+      "要件定義では、システム利用者のニーズの整理を行う。"
     ],
-    answer: 2,
-    explanation: `正解：ウ（最も不適切）
-
-ア○：正しい記述です。
-
-イ○：正しい記述です。例えば、障害発生時の復旧について「速やかに」ではなく「1分以内に復旧」「1時間以内に復旧」などと数値化します。
-
-ウ×（不適切）：要件は次の工程のインプットになるため、漏れなく明確化する必要がありますが、未確定な部分があるときは先送りすることなく、対象範囲として含めるもしくは含めないなど決定すべきです。
-
-エ○：正しい記述です。要件定義では、ユーザーヒアリングなどにより、システム利用者のニーズを整理して、現状の業務プロセスの改善点や、要件を洗い出していきます。
-
-【重要ポイント】
-要件定義は情報システム開発の「基本計画」の工程で行われます。
-一般的な流れ：
-1. 経営上解決したい課題を基に、情報システムの目的と業務範囲を決定
-2. 対象範囲について現状の業務プロセスや情報システムを分析
-3. ユーザーヒアリング等により改善点・新たな要件を洗い出し`,
+    answerIndex: 2,
+    explanation: {
+      summary: "本問では情報システムの要件定義について問われています。\n要件定義は、情報システム開発の最初の工程である「基本計画」にて行われます。",
+      details: "正解：ウ\n\nア ○：情報システムの開発における業務要件を定義する目的を表しています。\nイ ○：数値化できるものは極力、数値化します。「速やかに」ではなく「1時間以内に復旧」のようにし、単位も明確にします。\nウ ×：要件は次の工程のインプットになるため、漏れなく明確化する必要がありますが、未確定な部分があるときは先送りすることなく、対象範囲として含めるもしくは含めないなど決定すべきです。\nエ ○：ユーザーヒアリングなどによりシステム利用者のニーズを整理し、改善点や要件を洗い出します。"
+    }
   },
   {
     id: 6,
     title: "RFPとRFI",
     question: "ユーザ企業がITベンダーに提出する文書に関する記述として、最も適切なものはどれか。",
-    choices: [
+    options: [
       "RFIとは、システムが提供するサービスの品質保証やペナルティに関する契約内容を明らかにし、ITベンダーと合意する文書をいう。",
       "SLAとは、発注先候補のITベンダーに情報提供を依頼する文書をいう。",
-      "RFP とは、ITベンダーからの提案を評価・検討し、システム開発を依頼する文書をいう。",
-      "RFP とは、システムの概要や主要な機能などに関する提案を依頼する文書をいう。",
+      "RFPとは、ITベンダーからの提案を評価・検討し、システム開発を依頼する文書をいう。",
+      "RFPとは、システムの概要や主要な機能などに関する提案を依頼する文書をいう。"
     ],
-    answer: 3,
-    explanation: `正解：エ
-
-ア×：選択肢の記述の内容はSLAの説明です。RFIは、情報システムの導入や業務委託を行うにあたり、発注先候補のシステム開発会社に情報提供を依頼するための文書です。
-
-イ×：選択肢の記述の内容はRFIの説明です。SLAは、サービス提供者とサービス委託者との間で、提供するサービス内容と範囲・品質に対する水準などをあらかじめ定めておくものです。
-
-ウ×：選択肢の記述の内容は、システム開発の発注書の説明です。
-
-エ○：正しい記述です。RFPは、システム開発の発注に先立ち、システムの概要や主要な機能などに関する提案を依頼する文書のことです。
-
-【重要ポイント】
-●RFI（Request For Information：情報提供依頼書）：発注先候補のシステム開発会社に情報提供を依頼する文書
-●RFP（Request For Proposal：提案依頼書）：ITベンダーなどの業者から具体的な提案をしてもらうために、システムに対する要件を伝えるための文書
-●SLA（Service Level Agreement）：サービス提供者とサービス委託者との間で、提供するサービス内容と範囲・品質に対する水準を定め、達成できなかった場合のルールをあらかじめ合意しておく文書・契約`,
+    answerIndex: 3,
+    explanation: {
+      summary: "本問では、ユーザ企業がITベンダーに提出する文書の種類について問われています。",
+      details: "正解：エ\n\nア ×：記述の内容は「SLA」の説明です。RFIは情報提供依頼書です。\nイ ×：記述の内容は「RFI」の説明です。SLAはサービスレベル合意書です。\nウ ×：記述の内容はシステム開発の「発注書」の説明です。\nエ ○：正しい記述です。RFP(Request For Proposal) は、システム開発の発注に先立ち、システムの概要や主要な機能などに関する提案を依頼する文書です。"
+    }
   },
   {
     id: 7,
     title: "工数と費用の見積り",
-    question: "情報システム開発の工数と費用の見積りに関する次の文中の空欄Ａ～Ｃに入る語句の組み合わせとして、最も適切なものを下記の解答群から選べ。\n\n情報システムの開発工数を見積る手法の1つとして、システムの持つ機能をもとに、機能ごとの複雑さなどから（　Ａ　）という点数をつけて評価する方法がある。\n\nこの方法では、まずシステムの機能を洗い出し、機能のタイプごとに機能の数を数えます。次に、機能ごとに複雑さを評価し、（　Ｂ　）段階のタイプに分けます。さらに、各タイプ別の係数を掛けて（　Ａ　）を計算します。\n\nこれは、詳細なプログラムなどの設計の（　Ｃ　）に行われます。",
-    choices: [
+    question: "情報システム開発の工数と費用の見積りに関する次の文中の空欄Ａ～Ｃに入る語句の組み合わせとして、最も適切なものを下記の解答群から選べ。\n\n情報システムの開発工数を見積る手法の1つとして、システムの持つ機能をもとに、機能ごとの複雑さなどから（　Ａ　）という点数をつけて評価する方法がある。\nこの方法では、まずシステムの機能を洗い出し、機能のタイプごとに機能の数を数えます。次に、機能ごとに複雑さを評価し、（ Ｂ　）段階のタイプに分けます。さらに、各タイプ別の係数を掛けて（　Ａ　）を計算します。\nこれは、詳細なプログラムなどの設計の（　Ｃ　）に行われます。",
+    options: [
       "Ａ：ファンクションポイント　Ｂ：3　Ｃ：前",
       "Ａ：スコアリングモデル　Ｂ：4　Ｃ：前",
       "Ａ：ファンクションポイント　Ｂ：4　Ｃ：後",
-      "Ａ：スコアリングモデル　Ｂ：3　Ｃ：後",
+      "Ａ：スコアリングモデル Ｂ：3　Ｃ：後"
     ],
-    answer: 0,
-    explanation: `正解：ア
-
-A：ファンクションポイント
-スコアリングモデルとは、定性的な評価項目を定量化する方法です。定性的な評価項目のそれぞれに対して重み付けをして、一つの数式で表現し定量化します。
-
-B：3
-ファンクションポイント法では、機能ごとに複雑さを評価して、「簡単」「普通」「複雑」の3段階に分けます。
-
-C：前
-このような開発工数の見積もりは、詳細なプログラムを設計する前の「基本設計」のプロセスにて行われます。ファンクションポイント法では、必要な機能が分かった段階で工数と費用の概算見積りを行うことができます。
-
-【重要ポイント】
-ファンクションポイント法：開発工数の見積りの代表的な方法の１つ。
-機能（ファンクション）ごとの複雑さによって点数を付け、その点数を合計することによって工数を見積る方法。
-複雑さは「簡単」「普通」「複雑」の3段階に分類。`,
+    answerIndex: 0,
+    explanation: {
+      summary: "本問ではファンクションポイント法について問われています。\nファンクションポイント法は、機能ごとの複雑さによって点数を付け、その点数を合計することによって工数を見積る方法です。",
+      details: "正解：ア\n\nA：ファンクションポイント\n（スコアリングモデルは定性的な評価項目を定量化する方法です）\nB：3\n（機能ごとに複雑さを評価して、「簡単」「普通」「複雑」の3段階に分けます）\nC：前\n（開発工数の見積もりは、詳細なプログラムを設計する前の「基本設計」プロセスにて行われます）",
+      customRender: () => (
+        <div className="mt-4 overflow-x-auto text-sm">
+          <table className="min-w-full border-collapse border border-gray-400 bg-white">
+            <thead className="bg-orange-100">
+              <tr>
+                <th className="border border-gray-400 px-4 py-2 text-left">タイプ</th>
+                <th className="border border-gray-400 px-4 py-2">簡単</th>
+                <th className="border border-gray-400 px-4 py-2">普通</th>
+                <th className="border border-gray-400 px-4 py-2">複雑</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td className="border border-gray-400 px-4 py-2">外部入力 (入力画面など)</td><td className="border border-gray-400 px-4 py-2 text-center">3 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">4 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">6 × 数</td></tr>
+              <tr><td className="border border-gray-400 px-4 py-2">外部出力 (帳票など)</td><td className="border border-gray-400 px-4 py-2 text-center">4 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">5 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">7 × 数</td></tr>
+              <tr><td className="border border-gray-400 px-4 py-2">外部照会 (照会画面など)</td><td className="border border-gray-400 px-4 py-2 text-center">3 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">4 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">6 × 数</td></tr>
+              <tr><td className="border border-gray-400 px-4 py-2">内部論理ファイル (DB等)</td><td className="border border-gray-400 px-4 py-2 text-center">7 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">10 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">15 × 数</td></tr>
+              <tr><td className="border border-gray-400 px-4 py-2">外部インターフェイス</td><td className="border border-gray-400 px-4 py-2 text-center">5 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">7 × 数</td><td className="border border-gray-400 px-4 py-2 text-center">10 × 数</td></tr>
+            </tbody>
+          </table>
+        </div>
+      )
+    }
   },
   {
     id: 8,
     title: "UML",
     question: "業務システムの分析・設計に用いられるUMLに関する記述として、最も適切なものはどれか。",
-    choices: [
+    options: [
       "UMLは、オブジェクト指向によるシステム開発の方法論である。",
       "UMLにて、設計図をどのような順序で用いるかは、UML標準で決められている。",
       "ネットワーク図は、オブジェクト間の処理プロセスを表現するUMLのダイアグラムの1つである。",
-      "ユースケース図は、システムにどのような利用者がいるか、その利用者がどのような操作をするかを表すUMLのダイアグラムの１つである。",
+      "ユースケース図は、システムにどのような利用者がいるか、その利用者がどのような操作をするかを表すUMLのダイアグラムの１つである。"
     ],
-    answer: 3,
-    explanation: `正解：エ
-
-ア×：UMLは、オブジェクト指向アプローチのシステム開発における、設計図の統一表記法です。システム開発に関する方法論は含まれていません。
-
-イ×：UMLは、設計図の種類や書き方を定義したものであり、方法論は含まれていないため、どの設計書をどういう順序で使うかは定められていません。
-
-ウ×：シーケンス図の説明に関する記述です。UMLにネットワーク図というダイアグラムは含まれていません。
-
-エ○：正しい記述です。ユースケース図では、機能をユースケースで表し、機能を利用する人や外部システムをアクターで表して、これらの関係を表現します。
-
-【重要ポイント】
-UML（Unified Modeling Language）：オブジェクト指向アプローチのシステム開発における設計図の統一表記法
-
-代表的なUMLのダイアグラム：
-●ユースケース図：要件定義等の上流工程で業務の機能を表現（アクターとユースケースの関係）
-●クラス図：オブジェクトの「型」を定義
-●シーケンス図：オブジェクト間の処理プロセスを表す`,
+    answerIndex: 3,
+    explanation: {
+      summary: "本問ではUMLについて問われています。\nUMLは、オブジェクト指向アプローチのシステム開発における、設計図の統一表記法です。",
+      details: "正解：エ\n\nア ×：UMLは表記法であり、方法論は含まれていません。\nイ ×：どの設計書をどういう順序で使うかは定められていません。\nウ ×：オブジェクト間の処理プロセスを表すのは「シーケンス図」です。ネットワーク図はUMLにはありません。\nエ ○：正しい記述です。ユースケース図では、機能をユースケースで表し、機能を利用する人や外部システムをアクターで表して関係を表現します。",
+      table: [
+        { title: "ユースケース図", desc: "要件定義などの上流工程で、業務の機能を表現するために使われる" },
+        { title: "クラス図", desc: "オブジェクトの「型」を定義する" },
+        { title: "シーケンス図", desc: "オブジェクト間の処理プロセスを表す" }
+      ]
+    }
   },
   {
     id: 9,
     title: "情報システムの設計1",
     question: "情報システムの設計に関する記述として、最も適切なものはどれか。",
-    choices: [
+    options: [
       "DFDは、プロセス指向アプローチで用いられ、データの流れと時間的情報を記述する手法である。",
       "ER図は、データ指向アプローチで用いられる図表であり、データ間の関連を描画する。",
       "STDは、オブジェクト指向アプローチで用いられる、モデリング言語の１つである。",
-      "DOAでは、システム開発後のデータ構造の変更が必要な際、一部のプログラムへの影響で抑えられやすい。",
+      "DOAでは、システム開発後のデータ構造の変更が必要な際、一部のプログラムへの影響で抑えられやすい。"
     ],
-    answer: 1,
-    explanation: `正解：イ
-
-ア×：DFDは、データの処理の流れを記述しますが、時間的情報については記述されません。
-
-イ○：正しい記述です。なお、ER図は、ERD（Entity-Relationship Diagram）とも呼ばれます。
-
-ウ×：STDは、状態遷移図とも呼ばれ、システムの状態がイベントによってどのように変わるのかを表した図で、外部設計や内部設計において、主に画面設計の際に用いられます。オブジェクト指向アプローチで用いられるモデリング言語としては、UMLがあります。
-
-エ×：DOAでは、プログラムを追加・変更するときにはデータ構造は変更しなくて良いため、システムの変更や拡張に対応しやすいというメリットがあります。一方で、データ構造を変更する場合は、関連するプログラムを全て変更する必要があります。
-
-【重要ポイント】
-設計アプローチの種類：
-●POA（プロセス指向アプローチ）：業務プロセスに着目。フローチャートやDFDを使用。
-●DOA（データ指向アプローチ）：データ構造に着目。E-Rモデル（ER図）を使用。エンティティとリレーションでデータ構造を表す。
-●OOA（オブジェクト指向アプローチ）：データと処理をカプセル化。UMLを使用。`,
+    answerIndex: 1,
+    explanation: {
+      summary: "本問では情報システムの設計について問われています。\n情報システムの設計アプローチには、POA(プロセス指向)、DOA(データ指向)、OOA(オブジェクト指向)があります。",
+      details: "正解：イ\n\nア ×：DFDはデータと処理の流れを記述しますが、時間的情報については記述されません。\nイ ○：正しい記述です。ER図はERDとも呼ばれます。\nウ ×：STD(状態遷移図)はオブジェクト指向特有のものではありません。オブジェクト指向で用いられるのはUMLです。\nエ ×：DOAではデータ構造を変更する場合、関連するプログラムを全て変更する必要があります。"
+    }
   },
   {
     id: 10,
     title: "情報システムの設計2",
-    question: "情報システムの設計に用いられる下記の図（DFD：データフローダイアグラム）に関する説明として、最も適切なものを下記の解答群の中から選べ。\n\n【図の説明】\n外部エンティティ（受注）→ プロセス「受注入力」← データストア「商品ファイル」\nプロセス「受注入力」→ データストア「在庫ファイル」\nプロセス「受注入力」→ データストア「注文ファイル」\nプロセス「受注入力」→ 外部エンティティ（得意先）\n\n※この図はPOA（プロセス指向アプローチ）で用いられるDFD（データフローダイアグラム）の例示です。",
-    choices: [
+    question: "情報システムの設計に用いられる下記の図（※担当者から注文プロセスへ、注文プロセスから商品ファイルと在庫確認プロセスへデータの流れがある図）に関する説明として、最も適切なものを下記の解答群の中から選べ。",
+    options: [
       "データベースをどのように構築したらいいかを示すERDである。",
       "業務とデータの処理の関係を記述したDFDである。",
       "データと処理をセットにしたクラス図である。",
-      "図中の「商品ファイル」や「在庫ファイル」は、データマートと呼ばれる。",
+      "図中の「商品ファイル」や「在庫ファイル」は、データマートと呼ばれる。"
     ],
-    answer: 1,
-    explanation: `正解：イ
-
-ア×：図はDFDであるため、記述は不適切です。
-
-イ○：正しい記述です。
-
-ウ×：図はDFDであるため、記述は不適切です。
-
-エ×：図中の「商品ファイル」や「注文ファイル」は、データストアです。データマートとは、全社のデータが蓄積されたデータウェアハウスから、テーマ別にデータを抽出したものであり、BI（Business Intelligence）にて利用されます。
-
-【重要ポイント】
-DFD（Data Flow Diagram：データフローダイアグラム）：POAで用いられる図表。データと処理の流れを表す。
-DFDの構成要素：
-●外部エンティティ：データの源や受け取り先
-●プロセス：データの変換・処理
-●データストア：データの保存場所
-●データフロー：データの流れを示す矢印
-
-ERD（ER図）：DOAで用いられる。エンティティとリレーションでデータ構造を表す。
-クラス図：OOAで用いられるUMLの一種。`,
+    answerIndex: 1,
+    explanation: {
+      summary: "本問では情報システムの設計で用いられる図表について問われています。\n問題文で示されている図は、プロセス(丸)とデータストア(二重線)、データの流れ(矢印)から構成されるDFD（データフローダイアグラム）です。",
+      details: "正解：イ\n\nア ×：図はDFDです。ERDはエンティティとリレーションで表されます。\nイ ○：正しい記述です。POAで用いられるDFDです。\nウ ×：図はDFDです。クラス図はデータと手続きをセットにした矩形で表されます。\nエ ×：図中の「商品ファイル」は「データストア」です。データマートはDWHから抽出された目的別データベースのことです。"
+    }
   },
   {
     id: 11,
     title: "XP（エクストリーム･プログラミング）",
     question: "XP（エクストリーム･プログラミング）に関する記述として、最も不適切なものはどれか。",
-    choices: [
+    options: [
       "XPはアジャイル開発の手法の１つであり、小規模なシステムの開発に向いている。",
       "XPでは、設計・開発・テストを繰り返して、システム開発を進めていく。",
       "XPのプラクティスとして、ビジュアルプログラミングが定められている。",
-      "XPでは、原理とすべき価値と具体的なプラクティスが定められている。",
+      "XPでは、原理とすべき価値と具体的なプラクティスが定められている。"
     ],
-    answer: 2,
-    explanation: `正解：ウ（最も不適切）
-
-ア○：正しい記述です。XPを含め、アジャイル開発は比較的小規模なシステムの開発に向いています。
-
-イ○：アジャイル開発手法では、開発対象を多数の小さな機能に分割し、1つの反復（イテレーション）で1機能を開発します。イテレーションのサイクルを継続して行い、機能を追加開発していきます。各イテレーションの中では、設計、開発（コーディング）、テストといった工程を行います。
-
-ウ×（不適切）：XPには複数のプラクティスが定められていますが、ビジュアルプログラミングというプラクティスは含まれていません。XPの代表的なプラクティスとして、ペアプログラミングが挙げられます。ペアプログラミングでは、1人がプログラムのコードを書き、隣にいるもう1人が同時にそれをチェックしながら作業を進めます。
-
-エ○：XPでは、原理とすべき価値が定められています。XPの価値とは、「コミュニケーション」「シンプル」「フィードバック」「勇気」「尊重」です。
-
-【重要ポイント】
-XP（eXtreme Programming）：アジャイル開発の手法の1つ。
-特徴：プロジェクトを短い期間に区切り、反復的に設計・開発・テストを繰返す。小規模システムに向いている。
-代表的プラクティス：ペアプログラミング（ビジュアルプログラミングではない）`,
+    answerIndex: 2,
+    explanation: {
+      summary: "本問ではXP（エクストリーム･プログラミング）について問われています。\n迅速にプログラムを開発するアジャイル開発プロセスの具体的な手法の1つです。",
+      details: "正解：ウ\n\nア ○：XPを含め、アジャイル開発は比較的小規模なシステムの開発に向いています。\nイ ○：イテレーションのサイクルを継続して行い、各イテレーションの中で設計、開発、テストを行います。\nウ ×：XPに「ビジュアルプログラミング」というプラクティスは含まれていません。代表的なプラクティスは「ペアプログラミング」などです。\nエ ○：XPでは「コミュニケーション」「シンプル」「フィードバック」「勇気」「尊重」という価値と、それに基づくプラクティスが定められています。"
+    }
   },
   {
     id: 12,
     title: "RAD（Rapid Application Development）",
     question: "RAD（Rapid Application Development）に関する記述として、最も適切なものはどれか。",
-    choices: [
+    options: [
       "RADは、比較的長期間のプロジェクトに適用される開発手法である。",
       "RADでは、開発サイクルを繰り返すことによって、システムの完成度を高めていく。",
       "RADでは、エンジニアだけでなく、エンドユーザも含めたチームでプロジェクトを進める。",
-      "RADで用いられるCASEツールは、コーディングやテスト工程の生産を高めるためのものであり、設計工程は対象としていない。",
+      "RADで用いられるCASEツールは、コーディングやテスト工程の生産を高めるためのものであり、設計工程は対象としていない。"
     ],
-    answer: 2,
-    explanation: `正解：ウ
-
-ア×：RADは、小規模・短期間のプロジェクトに適用される手法です。
-
-イ×：RADは、プロトタイプと呼ばれるシステムの完成イメージを何度も制作・評価し、次第に完成品に近づけていきます。開発サイクルを繰り返すことによってシステムの完成度を高めていく手法は、スパイラルモデルと言います。
-
-ウ○：正しい記述です。RADでは、プロトタイプをエンドユーザが評価・確認しながら、開発を進めていきます。
-
-エ×：CASEツールは、従来は人間の手で行っていた、設計工程やプログラミングの作業を、コンピュータで支援するためのソフトウェアです。
-・上流CASEツール：設計など上流工程を支援
-・下流CASEツール：プログラミングなどの下流工程を支援
-・統合CASEツール：上記を統合したもの
-
-【重要ポイント】
-RAD（Rapid Application Development）：プロトタイプを次第に完成品に近づけていく手法。ウォーターフォールモデルなど従来の手法より迅速に開発を進められる。
-特徴：エンドユーザを含む少人数のチームで担当、プロトタイピングやCASEツールを活用、小規模・短期間向け。`,
+    answerIndex: 2,
+    explanation: {
+      summary: "本問ではRAD（Rapid Application Development）について問われています。\nRADは、プロトタイプと呼ばれるシステムの完成イメージを何度も制作、評価し、次第に完成品に近づけてゆく手法です。",
+      details: "正解：ウ\n\nア ×：RADは、小規模・短期間のプロジェクトに適用される手法です。\nイ ×：開発サイクルを繰り返して完成度を高めるのは「スパイラルモデル」です。\nウ ○：正しい記述です。エンドユーザを含む少人数のチームで担当し、開発期間を短縮します。\nエ ×：CASEツールには設計など上流工程を支援する「上流CASEツール」も存在します。"
+    }
   },
   {
     id: 13,
     title: "システムテスト",
     question: "システムテスト（総合テスト）に関する記述として、最も適切なものはどれか。",
-    choices: [
+    options: [
       "システムテストでは、想定される最大業務負荷に耐えられるかどうかの確認が行われる。",
       "システムテストでは、主にモジュールやプログラム間のインターフェースや相互の関連性を検証する。",
       "システムテストでは、適正なデータを用いてテストを行い、例外処理は対象としなくてよい。",
-      "システムテストは、利用ユーザが中心となって行う。",
+      "システムテストは、利用ユーザが中心となって行う。"
     ],
-    answer: 0,
-    explanation: `正解：ア
-
-ア○：正しい記述です。システムテストでは、情報システム全体の性能のテストも行われ、想定される最大業務負荷に耐えられるかどうかの確認が行われます。これを、性能テストや負荷テストとも呼ばれます。
-
-イ×：モジュールやプログラム間のインターフェースや相互の関連性を検証するのは、結合テストです。
-
-ウ×：システムテストでは、正常な処理だけではなく、例外処理についてもテストを行います。これは例外テストとも呼ばれます。
-
-エ×：システムテストは、情報システム部門やソフトウェアハウスなどが中心となって行われます。利用ユーザが中心となって行うのは、検収テスト（受入テスト）です。
-
-【重要ポイント】
-テストの順番：単体テスト → 結合テスト → システムテスト（総合テスト）→ 検収テスト（受入テスト）
-
-●単体テスト：モジュールごとのテスト
-●結合テスト：複数のモジュールの組み合わせをテスト
-●システムテスト：情報システム全体の機能や性能などを確認（情報システム部門が中心）
-●検収テスト：ユーザ部門に引き渡す時のテスト（利用ユーザが中心）`,
+    answerIndex: 0,
+    explanation: {
+      summary: "本問では情報システムのテストについて問われています。\nテストは、単体テスト、結合テスト、システムテスト、検収テストの順で行われます。",
+      details: "正解：ア\n\nア ○：システムテストではシステム全体の性能のテストも行われ、最大業務負荷に耐えられるかの確認(負荷テスト/性能テスト)が行われます。\nイ ×：モジュール間の関連性を検証するのは「結合テスト」です。\nウ ×：正常な処理だけでなく、例外処理についてもテストを行います(例外テスト)。\nエ ×：システムテストは情報システム部門や開発側が中心です。利用ユーザが中心に行うのは「検収テスト(受入テスト)」です。"
+    }
   },
   {
     id: 14,
     title: "ウォークスルー",
     question: "ソフトウェア品質レビュー技法のうち、ウォークスルーに関する記述として、最も適切なものはどれか。",
-    choices: [
+    options: [
       "プログラム作成者、進行まとめ役、記録役、説明役、レビュー役を明確に決めて、厳格なレビューを公式に行う。",
       "プログラムを動作させて行う動的テストの１つである。",
       "システム開発者が集まって実施され、プロジェクト責任者は参加が必須である。",
-      "システム開発の早い時期で、欠陥を発見するために行われる。",
+      "システム開発の早い時期で、欠陥を発見するために行われる。"
     ],
-    answer: 3,
-    explanation: `正解：エ
-
-ア×：インスペクションに関する記述です。ウォークスルーは公式なレビューではありません。
-
-イ×：ウォークスルーやインスペクションは、プログラムを動作させて行う動的テストではなく、プログラムの動作を伴わない静的テストです。
-
-ウ×：ウォークスルーは、システム開発者が集まって実施されますが、プロジェクト責任者は参加が必須ではありません。必要に応じて、インフォーマルに開発者が集まって実施します。
-
-エ○：正しい記述です。ソフトウェアが完成する前の工程で、問題点を発見して、早期に欠陥を除去するために行われます。
-
-【重要ポイント】
-●ウォークスルー：開発者達が運営する非公式なレビュー。静的テスト。開発の早い時期に欠陥を発見するために行われる。プロジェクト責任者の参加は任意。
-●インスペクション：公式なレビュー。プロジェクト責任者の下で厳密に行われる。役割（プログラム作成者・進行まとめ役・記録役・説明役・レビュー役）が明確に決まっている。`,
+    answerIndex: 3,
+    explanation: {
+      summary: "本問ではウォークスルーについて問われています。\nウォークスルーは、ソフトウェア開発の各工程の成果物について、問題点が無いかを集団で検証する作業です。",
+      details: "正解：エ\n\nア ×：これは「インスペクション」に関する記述です。ウォークスルーは公式なレビューではありません。\nイ ×：ウォークスルーやインスペクションはプログラムの動作を伴わない「静的テスト」です。\nウ ×：ウォークスルーは開発者が集まって実施しますが、プロジェクト責任者の参加は必須ではありません(インフォーマル)。\nエ ○：正しい記述です。ソフトウェアが完成する前の工程で、問題点を発見して早期に欠陥を除去するために行われます。"
+    }
   },
   {
     id: 15,
     title: "ホワイトボックステスト、ブラックボックステスト",
     question: "ホワイトボックステストやブラックボックステストに関する記述として、最も適切なものはどれか。",
-    choices: [
+    options: [
       "ホワイトボックステストでは、分岐命令やモジュールの数が増えると、テストデータが急増する。",
       "ブラックボックステストでは、テストデータの作成基準として、命令や分岐の網羅率を使用する。",
       "ホワイトボックステストでは、プログラムの入力と出力の関係に注目してテストデータを作成する。",
-      "ブラックボックステストは、単体テストでのみ実施される。",
+      "ブラックボックステストは、単体テストでのみ実施される。"
     ],
-    answer: 0,
-    explanation: `正解：ア
-
-ア○：ホワイトボックステストでは、プログラム中の分岐命令やモジュールなどの数が増えると、テスト対象として、それらの条件分岐やモジュールの組み合わせの数が等比級数的に増加します。
-
-イ×：網羅率とは、ホワイトボックステストを行うときに用いる基準で、プログラムに対して、どの程度テストを実施したかを表すための指標です。
-
-ウ×：プログラムの入力と出力の関係に注目してテストデータを作成するのは、ブラックボックステストです。ホワイトボックステストでは、プログラムの内部構造に着目してテストデータを作成します。
-
-エ×：ブラックボックステストは、単体テストだけでなく、結合テストやシステムテスト、検収テストの段階でも行われます。
-
-【重要ポイント】
-●ホワイトボックステスト：プログラムの内部構造に注目。命令文や条件分岐について漏れなく網羅的にテスト。「網羅率」を使用。分岐やモジュールが増えるとテストデータが急増。
-●ブラックボックステスト：プログラムの入力と出力に注目。内部の動作は問わない。正常入力だけでなく不正な入力による例外処理も検証。単体テスト以外でも使用。`,
+    answerIndex: 0,
+    explanation: {
+      summary: "本問ではホワイトボックステストとブラックボックステストについて問われています。\nホワイトボックステストは「内部構造」に注目し、ブラックボックステストは「入出力」に注目します。",
+      details: "正解：ア\n\nア ○：正しい記述です。内部の分岐等が増えると、組み合わせの数が等比級数的に増加します。\nイ ×：網羅率は「ホワイトボックステスト」で用いる基準です。\nウ ×：入出力の関係に注目するのは「ブラックボックステスト」です。\nエ ×：ブラックボックステストは結合テストやシステムテスト等でも行われます。"
+    }
   },
   {
     id: 16,
     title: "結合テスト",
     question: "結合テストに関する記述として、最も不適切なものはどれか。",
-    choices: [
+    options: [
       "結合テストの方法の１つにビッグバンテストがあり、複数のモジュールを一挙に結合して、その動作を検証する。",
       "ビッグバンテストでは、結合テスト全体の時間が短縮できるメリットがある一方、バグのある箇所の特定が難しく、かえって時間がかかってしまったり、バグが残りやすくなったりするなどのリスクもある。",
       "上位のモジュールから順番に結合してテストをしていく手法をトップダウンテストという。また、下位のモジュールから順番に結合してテストをしていく手法のことを、ボトムアップテストという。",
-      "上位モジュールと下位モジュールを結合してテストを実施したいが上位モジュールが完成していない場合、スタブと呼ばれるダミーモジュールを作ってテストする。",
+      "上位モジュールと下位モジュールを結合してテストを実施したいが上位モジュールが完成していない場合、スタブと呼ばれるダミーモジュールを作ってテストする。"
     ],
-    answer: 3,
-    explanation: `正解：エ（最も不適切）
-
-ア○：ビッグバンテストの内容の説明として、適切です。
-
-イ○：ビッグバンテストの特徴の説明として、適切です。
-
-ウ○：トップダウンテストとボトムアップテストの概要の説明として、適切です。
-
-エ×（不適切）：スタブとは、下位モジュールが完成していない場合に使われるダミーモジュールのことです。上位モジュールが完成していない場合に使われるダミーモジュールは、ドライバと呼ばれます。
-
-【重要ポイント】
-●トップダウンテスト：上位のモジュールから順番に結合してテスト。下位モジュールが未完成の場合は「スタブ」（ダミー）を使用。
-●ボトムアップテスト：下位のモジュールから順番に結合してテスト。上位モジュールが未完成の場合は「ドライバ」（ダミー）を使用。
-●ビッグバンテスト：全モジュールを一斉に結合してテスト。時間短縮のメリットがあるが、バグ特定が難しいリスクがある。`,
-  },
+    answerIndex: 3,
+    explanation: {
+      summary: "本問では結合テストの種類や詳細について問われています。\nモジュールを組み合わせる結合テストには、トップダウン、ボトムアップ、ビッグバンなどの手法があります。",
+      details: "正解：エ\n\nア ○：ビッグバンテストの内容として適切です。\nイ ○：ビッグバンテストの特徴として適切です。\nウ ○：トップダウンテストとボトムアップテストの概要として適切です。\nエ ×：上位モジュールが完成していない場合に使われるダミーモジュールは「ドライバ」です。「スタブ」は下位モジュールが完成していない場合に使われるダミーです。"
+    }
+  }
 ];
 
-// ============================================================
-// メインコンポーネント
-// ============================================================
+
+// ==========================================
+// 3. Main Application Component
+// ==========================================
 export default function App() {
-  const [screen, setScreen] = useState("login"); // login | home | quiz | answer | results | history
-  const [userId, setUserId] = useState("");
-  const [userIdInput, setUserIdInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState({}); // { qId: { correct: bool, review: bool, answeredAt: string } }
-  const [mode, setMode] = useState("all");
-  const [questions, setQuestions] = useState([]);
+  // --- States ---
+  const [userId, setUserId] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [view, setView] = useState('login'); // login, home, quiz, result, history
+  const [userData, setUserData] = useState({
+    history: {},
+    review: {},
+    progressIndex: 0,
+    progressMode: 'all'
+  });
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+
+  // Quiz execution states
+  const [currentQuestions, setCurrentQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selected, setSelected] = useState(null);
+  const [currentMode, setCurrentMode] = useState('all');
   const [sessionResults, setSessionResults] = useState([]);
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [showExplanation, setShowExplanation] = useState(false);
 
-  // Firestoreからデータ読み込み
-  const loadData = useCallback(async (uid) => {
-    console.log("[loadData] userId:", uid);
-    setLoading(true);
+  // --- Firebase Interactions ---
+  const saveUserDataToFirebase = async (dataToSave) => {
+    if (!db || !userId) return;
     try {
-      const ref = doc(db, APP_ID, uid);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const data = snap.data();
-        console.log("[loadData] loaded:", data);
-        setHistory(data.history || {});
-      } else {
-        console.log("[loadData] no data, init empty");
-        setHistory({});
-      }
-    } catch (e) {
-      console.error("[loadData] error:", e);
-      setHistory({});
+      console.log("Saving data to Firebase...", dataToSave);
+      await setDoc(doc(db, APP_ID, userId), dataToSave, { merge: true });
+    } catch (error) {
+      console.error("Error saving data:", error);
     }
-    setLoading(false);
-  }, []);
-
-  // Firestoreへ保存
-  const saveData = useCallback(async (uid, newHistory) => {
-    console.log("[saveData] saving:", uid, newHistory);
-    try {
-      const ref = doc(db, APP_ID, uid);
-      await setDoc(ref, { history: newHistory }, { merge: true });
-      console.log("[saveData] saved successfully");
-    } catch (e) {
-      console.error("[saveData] error:", e);
-    }
-  }, []);
-
-  const handleLogin = async () => {
-    const uid = userIdInput.trim();
-    if (!uid) return;
-    console.log("[login] uid:", uid);
-    setUserId(uid);
-    await loadData(uid);
-    setScreen("home");
   };
 
-  const startQuiz = () => {
-    let qs = [...ALL_QUESTIONS];
-    if (mode === "incorrect") {
-      qs = qs.filter(q => history[q.id]?.correct === false);
-    } else if (mode === "review") {
-      qs = qs.filter(q => history[q.id]?.review === true);
+  const loadUserDataFromFirebase = async (id) => {
+    if (!db) {
+      console.warn("Firebase not initialized. Using local memory only.");
+      setIsLoggedIn(true);
+      return;
     }
-    if (qs.length === 0) {
+    setIsLoading(true);
+    try {
+      console.log(`Loading data for user: ${id}`);
+      const docSnap = await getDoc(doc(db, APP_ID, id));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserData({
+          history: data.history ?? {},
+          review: data.review ?? {},
+          progressIndex: data.progressIndex ?? 0,
+          progressMode: data.progressMode ?? 'all'
+        });
+        if (data.progressIndex > 0) {
+          setShowResumePrompt(true);
+        }
+      } else {
+        // 新規ユーザー
+        setUserData({ history: {}, review: {}, progressIndex: 0, progressMode: 'all' });
+      }
+      setIsLoggedIn(true);
+      setView('home');
+    } catch (error) {
+      console.error("Error loading data:", error);
+      alert("データの読み込みに失敗しました。");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Handlers ---
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (userId.trim().length === 0) return;
+    loadUserDataFromFirebase(userId.trim());
+  };
+
+  const handleLogout = () => {
+    setUserId('');
+    setIsLoggedIn(false);
+    setView('login');
+    setUserData({ history: {}, review: {}, progressIndex: 0, progressMode: 'all' });
+  };
+
+  const buildQuestionList = (mode) => {
+    let list = [];
+    if (mode === 'all') {
+      list = [...quizData];
+    } else if (mode === 'wrong') {
+      list = quizData.filter(q => userData.history[q.id]?.status === 'wrong');
+    } else if (mode === 'review') {
+      list = quizData.filter(q => userData.review[q.id] === true);
+    }
+    return list;
+  };
+
+  const startQuiz = async (mode, isResume = false) => {
+    let startIdx = 0;
+    const list = buildQuestionList(mode);
+    
+    if (list.length === 0) {
       alert("該当する問題がありません。");
       return;
     }
-    console.log("[startQuiz] mode:", mode, "count:", qs.length);
-    setQuestions(qs);
-    setCurrentIndex(0);
-    setSelected(null);
-    setSessionResults([]);
-    setScreen("quiz");
-  };
 
-  const handleSelect = (idx) => {
-    if (selected !== null) return;
-    console.log("[handleSelect] selected:", idx);
-    setSelected(idx);
-    const q = questions[currentIndex];
-    const correct = idx === q.answer;
-    const now = new Date().toISOString();
-    const prev = history[q.id] || {};
-    const updated = {
-      ...history,
-      [q.id]: {
-        ...prev,
-        correct,
-        answeredAt: now,
-        review: prev.review || false,
-      },
-    };
-    setHistory(updated);
-    saveData(userId, updated);
-    setSessionResults(prev => [...prev, { id: q.id, correct }]);
-    setScreen("answer");
-  };
-
-  const toggleReview = (qId) => {
-    const prev = history[qId] || {};
-    const updated = {
-      ...history,
-      [qId]: { ...prev, review: !prev.review },
-    };
-    console.log("[toggleReview] qId:", qId, "->", !prev.review);
-    setHistory(updated);
-    saveData(userId, updated);
-  };
-
-  const goNext = () => {
-    if (currentIndex + 1 >= questions.length) {
-      setScreen("results");
+    if (isResume) {
+      startIdx = userData.progressIndex;
+      if (startIdx >= list.length) startIdx = 0; // フェールセーフ
     } else {
-      setCurrentIndex(i => i + 1);
-      setSelected(null);
-      setScreen("quiz");
+      // 最初から始める場合はDBの進捗をリセット
+      const newData = { ...userData, progressIndex: 0, progressMode: mode };
+      setUserData(newData);
+      await saveUserDataToFirebase({ progressIndex: 0, progressMode: mode });
+    }
+
+    setCurrentMode(mode);
+    setCurrentQuestions(list);
+    setCurrentIndex(startIdx);
+    setSessionResults([]);
+    setSelectedOption(null);
+    setShowExplanation(false);
+    setShowResumePrompt(false);
+    setView('quiz');
+  };
+
+  const handleResumeChoice = async (choice) => {
+    if (choice === 'resume') {
+      startQuiz(userData.progressMode, true);
+    } else {
+      // 最初から
+      await saveUserDataToFirebase({ progressIndex: 0 });
+      setUserData(prev => ({ ...prev, progressIndex: 0 }));
+      setShowResumePrompt(false);
     }
   };
 
-  const resetHistory = async () => {
-    if (!window.confirm("履歴をリセットしますか？")) return;
-    console.log("[resetHistory]");
-    setHistory({});
-    await saveData(userId, {});
+  const handleOptionSelect = async (optIndex) => {
+    if (showExplanation) return;
+    setSelectedOption(optIndex);
+    setShowExplanation(true);
+
+    const currentQ = currentQuestions[currentIndex];
+    const isCorrect = optIndex === currentQ.answerIndex;
+    
+    // 現在のセッション結果に追加
+    setSessionResults(prev => [...prev, { qId: currentQ.id, isCorrect }]);
+
+    // userDataを更新（履歴）
+    const newHistory = { ...userData.history };
+    newHistory[currentQ.id] = {
+      status: isCorrect ? 'correct' : 'wrong',
+      lastAttempt: new Date().toISOString()
+    };
+
+    // 進捗の更新
+    const nextIndex = currentIndex + 1;
+    const isComplete = nextIndex >= currentQuestions.length;
+    const newProgressIndex = isComplete ? 0 : nextIndex;
+
+    const newData = {
+      ...userData,
+      history: newHistory,
+      progressIndex: newProgressIndex,
+      progressMode: currentMode
+    };
+
+    setUserData(newData);
+    // 都度セーブ（落ちても大丈夫なように）
+    await saveUserDataToFirebase({
+      history: newHistory,
+      progressIndex: newProgressIndex,
+      progressMode: currentMode
+    });
   };
 
-  // ============================================================
-  // 統計
-  // ============================================================
-  const totalAnswered = Object.keys(history).length;
-  const totalCorrect = Object.values(history).filter(h => h.correct).length;
-  const totalReview = Object.values(history).filter(h => h.review).length;
-  const incorrectCount = Object.values(history).filter(h => h.correct === false).length;
+  const handleNextQuestion = () => {
+    if (currentIndex + 1 < currentQuestions.length) {
+      setCurrentIndex(prev => prev + 1);
+      setSelectedOption(null);
+      setShowExplanation(false);
+    } else {
+      setView('result');
+    }
+  };
 
-  // ============================================================
-  // レンダリング
-  // ============================================================
+  const toggleReviewFlag = async (qId) => {
+    const isReview = userData.review[qId] === true;
+    const newReview = { ...userData.review, [qId]: !isReview };
+    const newData = { ...userData, review: newReview };
+    setUserData(newData);
+    await saveUserDataToFirebase({ review: newReview });
+  };
 
-  if (loading) {
+  const getStats = () => {
+    const total = Object.keys(userData.history).length;
+    let correct = 0;
+    Object.values(userData.history).forEach(h => {
+      if (h.status === 'correct') correct++;
+    });
+    return { total, correct, wrong: total - correct };
+  };
+
+  // --- Renders ---
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">読み込み中...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="text-xl font-bold text-slate-600 animate-pulse">Loading...</div>
       </div>
     );
   }
 
-  // ログイン画面
-  if (screen === "login") {
+  if (view === 'login') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <BookOpen className="w-12 h-12 text-blue-600 mx-auto mb-3" />
-            <h1 className="text-2xl font-bold text-gray-800">スマート問題集</h1>
-            <p className="text-gray-500 text-sm mt-1">4-6 情報システムの開発</p>
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <User className="w-4 h-4 inline mr-1" />
-              ユーザーID（合言葉）
-            </label>
-            <input
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="例: hide2024"
-              value={userIdInput}
-              onChange={e => setUserIdInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleLogin()}
-            />
-            <p className="text-xs text-gray-400 mt-2">同じIDをPCとスマホで入力すると学習履歴を同期できます</p>
-          </div>
-          <button
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-            onClick={handleLogin}
-          >
-            開始する
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ホーム画面
-  if (screen === "home") {
-    return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-lg mx-auto">
-          <div className="bg-white rounded-2xl shadow p-6 mb-4">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-lg font-bold text-gray-800">4-6 情報システムの開発</h1>
-                <p className="text-xs text-gray-400">ユーザー: {userId}</p>
-              </div>
-              <BookOpen className="w-8 h-8 text-blue-500" />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
+        <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+          <h1 className="text-2xl font-bold text-center text-slate-800 mb-2">スマート問題集</h1>
+          <p className="text-center text-sm text-slate-500 mb-6">4-6 情報システムの開発</p>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">合言葉 (ユーザーID)</label>
+              <input
+                type="text"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                placeholder="例: my-secret-key-123"
+                className="w-full border-slate-300 rounded-md shadow-sm p-3 border focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+              <p className="text-xs text-slate-500 mt-2">※PCとスマホで同じ合言葉を入力すると履歴が同期されます。</p>
             </div>
-            {/* 統計 */}
-            <div className="grid grid-cols-4 gap-2 mb-4">
-              <div className="bg-blue-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-blue-700">{ALL_QUESTIONS.length}</p>
-                <p className="text-xs text-gray-500">全問題</p>
-              </div>
-              <div className="bg-green-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-green-700">{totalCorrect}</p>
-                <p className="text-xs text-gray-500">正解</p>
-              </div>
-              <div className="bg-red-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-red-700">{incorrectCount}</p>
-                <p className="text-xs text-gray-500">不正解</p>
-              </div>
-              <div className="bg-yellow-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-yellow-700">{totalReview}</p>
-                <p className="text-xs text-gray-500">要復習</p>
-              </div>
-            </div>
-            {totalAnswered > 0 && (
-              <div className="mb-4">
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>正解率</span>
-                  <span>{Math.round((totalCorrect / totalAnswered) * 100)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-green-500 h-2 rounded-full transition-all"
-                    style={{ width: `${Math.round((totalCorrect / totalAnswered) * 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* モード選択 */}
-          <div className="bg-white rounded-2xl shadow p-6 mb-4">
-            <h2 className="font-semibold text-gray-700 mb-3">出題モード</h2>
-            <div className="space-y-2">
-              {[
-                { key: "all", label: "すべての問題", count: ALL_QUESTIONS.length },
-                { key: "incorrect", label: "前回不正解の問題のみ", count: incorrectCount },
-                { key: "review", label: "要復習の問題のみ", count: totalReview },
-              ].map(m => (
-                <button
-                  key={m.key}
-                  onClick={() => setMode(m.key)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
-                    mode === m.key
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 text-gray-600 hover:border-gray-300"
-                  }`}
-                >
-                  <span className="text-sm font-medium">{m.label}</span>
-                  <span className={`text-sm font-bold ${mode === m.key ? "text-blue-600" : "text-gray-400"}`}>
-                    {m.count}問
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg shadow hover:bg-blue-700 transition-colors mb-3"
-            onClick={startQuiz}
-          >
-            クイズを始める
-          </button>
-          <button
-            className="w-full bg-gray-100 text-gray-700 py-3 rounded-2xl font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-            onClick={() => setScreen("history")}
-          >
-            <List className="w-4 h-4" />
-            履歴を見る
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // クイズ画面
-  if (screen === "quiz") {
-    const q = questions[currentIndex];
-    return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-lg mx-auto">
-          {/* ヘッダー */}
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={() => setScreen("home")} className="text-gray-400 hover:text-gray-600">
-              <Home className="w-5 h-5" />
+            <button
+              type="submit"
+              className="w-full bg-blue-600 text-white p-3 rounded-md hover:bg-blue-700 transition flex justify-center items-center font-bold"
+            >
+              ログインして始める <ChevronRight className="ml-2 w-5 h-5" />
             </button>
-            <span className="text-sm text-gray-500">{currentIndex + 1} / {questions.length}</span>
-            <div className="w-5" />
-          </div>
-          {/* プログレスバー */}
-          <div className="w-full bg-gray-200 rounded-full h-1.5 mb-6">
-            <div
-              className="bg-blue-500 h-1.5 rounded-full transition-all"
-              style={{ width: `${((currentIndex) / questions.length) * 100}%` }}
-            ></div>
-          </div>
-          <div className="bg-white rounded-2xl shadow p-6 mb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">問題 {q.id}</span>
-              <span className="text-xs text-gray-500">{q.title}</span>
-              {history[q.id]?.review && (
-                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">要復習</span>
-              )}
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'home') {
+    const wrongCount = quizData.filter(q => userData.history[q.id]?.status === 'wrong').length;
+    const reviewCount = Object.values(userData.review).filter(v => v).length;
+
+    return (
+      <div className="max-w-2xl mx-auto p-4 min-h-screen bg-slate-50">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-xl font-bold text-slate-800">スマート問題集 Top</h1>
+          <button onClick={handleLogout} className="text-sm text-slate-500 underline">ログアウト</button>
+        </div>
+
+        {showResumePrompt && (
+          <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg mb-6 shadow-sm">
+            <div className="flex items-center text-orange-800 mb-3">
+              <AlertCircle className="w-5 h-5 mr-2" />
+              <span className="font-bold">前回の続きから再開しますか？</span>
             </div>
-            <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{q.question}</p>
+            <p className="text-sm text-orange-700 mb-4">
+              {userData.progressMode === 'all' ? '「すべての問題」' : userData.progressMode === 'wrong' ? '「前回不正解のみ」' : '「要復習のみ」'}
+              の 第 {userData.progressIndex + 1} 問目まで進んでいます。
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => handleResumeChoice('resume')}
+                className="flex-1 bg-orange-600 text-white py-2 rounded-md font-bold hover:bg-orange-700 flex justify-center items-center"
+              >
+                <Play className="w-4 h-4 mr-1" /> 続きから
+              </button>
+              <button 
+                onClick={() => handleResumeChoice('restart')}
+                className="flex-1 bg-white text-orange-600 border border-orange-600 py-2 rounded-md font-bold hover:bg-orange-50"
+              >
+                最初から
+              </button>
+            </div>
           </div>
-          <div className="space-y-3">
-            {q.choices.map((choice, idx) => (
+        )}
+
+        <div className="space-y-4">
+          <button
+            onClick={() => startQuiz('all')}
+            className="w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition flex items-center justify-between"
+          >
+            <div className="flex items-center">
+              <div className="bg-blue-100 p-3 rounded-full mr-4 text-blue-600"><List className="w-6 h-6"/></div>
+              <div className="text-left">
+                <h3 className="font-bold text-slate-800">すべての問題</h3>
+                <p className="text-xs text-slate-500">全 {quizData.length} 問</p>
+              </div>
+            </div>
+            <ChevronRight className="text-slate-400" />
+          </button>
+
+          <button
+            onClick={() => startQuiz('wrong')}
+            disabled={wrongCount === 0}
+            className={`w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 transition flex items-center justify-between ${wrongCount === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md'}`}
+          >
+            <div className="flex items-center">
+              <div className="bg-red-100 p-3 rounded-full mr-4 text-red-600"><X className="w-6 h-6"/></div>
+              <div className="text-left">
+                <h3 className="font-bold text-slate-800">前回不正解の問題のみ</h3>
+                <p className="text-xs text-slate-500">全 {wrongCount} 問</p>
+              </div>
+            </div>
+            <ChevronRight className="text-slate-400" />
+          </button>
+
+          <button
+            onClick={() => startQuiz('review')}
+            disabled={reviewCount === 0}
+            className={`w-full bg-white p-4 rounded-xl shadow-sm border border-slate-200 transition flex items-center justify-between ${reviewCount === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md'}`}
+          >
+            <div className="flex items-center">
+              <div className="bg-yellow-100 p-3 rounded-full mr-4 text-yellow-600"><CheckSquare className="w-6 h-6"/></div>
+              <div className="text-left">
+                <h3 className="font-bold text-slate-800">要復習の問題のみ</h3>
+                <p className="text-xs text-slate-500">全 {reviewCount} 問</p>
+              </div>
+            </div>
+            <ChevronRight className="text-slate-400" />
+          </button>
+        </div>
+
+        <div className="mt-8">
+          <button
+            onClick={() => setView('history')}
+            className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold hover:bg-slate-700 transition"
+          >
+            学習履歴を確認する
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'quiz') {
+    const q = currentQuestions[currentIndex];
+    if (!q) return null; // Safety
+
+    return (
+      <div className="max-w-2xl mx-auto p-4 min-h-screen bg-slate-50 flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
+          <span className="text-sm font-bold text-slate-500">
+            問題 {currentIndex + 1} / {currentQuestions.length}
+          </span>
+          <button onClick={() => setView('home')} className="p-2 text-slate-500 hover:bg-slate-200 rounded-full">
+            <Home className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-slate-200 h-2 rounded-full mb-6">
+          <div 
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${((currentIndex + (showExplanation ? 1 : 0)) / currentQuestions.length) * 100}%` }}
+          ></div>
+        </div>
+
+        {/* Question Area */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-4 flex-grow">
+          <div className="flex items-center mb-4">
+            <span className="bg-slate-800 text-white text-xs font-bold px-2 py-1 rounded mr-2">Q{q.id}</span>
+            <h2 className="font-bold text-slate-800">{q.title}</h2>
+          </div>
+          <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">
+            {q.question}
+          </p>
+        </div>
+
+        {/* Options */}
+        <div className="space-y-3 mb-6">
+          {q.options.map((opt, idx) => {
+            let btnClass = "w-full text-left p-4 rounded-xl border-2 transition font-medium ";
+            if (!showExplanation) {
+              btnClass += "border-slate-200 hover:border-blue-400 hover:bg-blue-50 bg-white";
+            } else {
+              if (idx === q.answerIndex) {
+                btnClass += "border-green-500 bg-green-50 text-green-800";
+              } else if (idx === selectedOption) {
+                btnClass += "border-red-500 bg-red-50 text-red-800";
+              } else {
+                btnClass += "border-slate-200 bg-slate-50 text-slate-400 opacity-50";
+              }
+            }
+
+            return (
               <button
                 key={idx}
-                onClick={() => handleSelect(idx)}
-                className="w-full text-left bg-white rounded-xl shadow px-5 py-4 text-sm text-gray-700 hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent transition-all"
+                disabled={showExplanation}
+                onClick={() => handleOptionSelect(idx)}
+                className={btnClass}
               >
-                <span className="font-bold text-blue-500 mr-2">{["ア", "イ", "ウ", "エ"][idx]}</span>
-                {choice}
+                <div className="flex items-start">
+                  <span className="w-6 h-6 flex-shrink-0 flex justify-center items-center rounded-full bg-white border border-current mr-3 text-sm">
+                    {idx + 1}
+                  </span>
+                  <span>{opt}</span>
+                  {showExplanation && idx === q.answerIndex && <Check className="ml-auto w-5 h-5 text-green-600" />}
+                  {showExplanation && idx === selectedOption && idx !== q.answerIndex && <X className="ml-auto w-5 h-5 text-red-600" />}
+                </div>
               </button>
-            ))}
+            );
+          })}
+        </div>
+
+        {/* Explanation */}
+        {showExplanation && (
+          <div className="bg-blue-50 border border-blue-200 p-5 rounded-xl mb-6 animate-fade-in">
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="font-bold text-blue-900 flex items-center">
+                <AlertCircle className="w-5 h-5 mr-1" /> 解説
+              </h3>
+              <label className="flex items-center space-x-2 cursor-pointer bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-200 hover:bg-slate-50 transition">
+                <input 
+                  type="checkbox" 
+                  checked={userData.review[q.id] || false}
+                  onChange={() => toggleReviewFlag(q.id)}
+                  className="w-4 h-4 text-yellow-500 focus:ring-yellow-500 rounded border-gray-300"
+                />
+                <span className="text-sm font-bold text-slate-700">要復習</span>
+              </label>
+            </div>
+            
+            <div className="text-sm text-slate-800 space-y-3">
+              <p className="whitespace-pre-wrap font-medium">{q.explanation.summary}</p>
+              <div className="h-px w-full bg-blue-200 my-2"></div>
+              <p className="whitespace-pre-wrap">{q.explanation.details}</p>
+              
+              {/* Optional Tables Render */}
+              {q.explanation.table && (
+                <ul className="mt-3 space-y-2">
+                  {q.explanation.table.map((row, i) => (
+                    <li key={i} className="bg-white p-3 rounded border border-blue-100">
+                      <strong className="block text-blue-800 mb-1">{row.title}</strong>
+                      <span className="text-slate-600">{row.desc}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {/* Optional Custom Render (for complex diagrams simulated with CSS) */}
+              {q.explanation.customRender && q.explanation.customRender()}
+            </div>
           </div>
+        )}
+
+        {/* Next Button */}
+        {showExplanation && (
+          <button
+            onClick={handleNextQuestion}
+            className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-md hover:bg-blue-700 transition flex justify-center items-center sticky bottom-4"
+          >
+            {currentIndex + 1 < currentQuestions.length ? '次の問題へ' : '結果を見る'} <ChevronRight className="ml-2 w-5 h-5" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (view === 'result') {
+    const correctCount = sessionResults.filter(r => r.isCorrect).length;
+    const totalCount = sessionResults.length;
+    const score = Math.round((correctCount / totalCount) * 100);
+
+    return (
+      <div className="max-w-md mx-auto p-4 min-h-screen bg-slate-50 flex flex-col items-center justify-center">
+        <div className="bg-white w-full p-8 rounded-2xl shadow-lg text-center">
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">学習完了！</h2>
+          <p className="text-slate-500 mb-6">お疲れ様でした。</p>
+          
+          <div className="relative w-40 h-40 mx-auto mb-6">
+            <svg className="w-full h-full" viewBox="0 0 36 36">
+              <path className="text-slate-200" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path className="text-blue-500" strokeWidth="3" strokeDasharray={`${score}, 100`} stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-3xl font-bold text-slate-800">
+              {score}<span className="text-lg text-slate-500">%</span>
+            </div>
+          </div>
+
+          <div className="flex justify-center space-x-8 mb-8">
+            <div className="text-center">
+              <span className="block text-3xl font-bold text-green-500">{correctCount}</span>
+              <span className="text-xs text-slate-500">正解</span>
+            </div>
+            <div className="text-center">
+              <span className="block text-3xl font-bold text-red-500">{totalCount - correctCount}</span>
+              <span className="text-xs text-slate-500">不正解</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => { setView('home'); setSessionResults([]); }}
+            className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold hover:bg-slate-700 transition flex justify-center items-center"
+          >
+            <Home className="w-5 h-5 mr-2" /> ホームに戻る
+          </button>
         </div>
       </div>
     );
   }
 
-  // 解答・解説画面
-  if (screen === "answer") {
-    const q = questions[currentIndex];
-    const isCorrect = selected === q.answer;
-    const isReview = history[q.id]?.review || false;
+  if (view === 'history') {
+    const stats = getStats();
+    const pieData = [
+      { name: '正解', value: stats.correct, color: '#22c55e' },
+      { name: '不正解', value: stats.wrong, color: '#ef4444' },
+      { name: '未着手', value: quizData.length - stats.total, color: '#e2e8f0' }
+    ];
+
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={() => setScreen("home")} className="text-gray-400 hover:text-gray-600">
-              <Home className="w-5 h-5" />
-            </button>
-            <span className="text-sm text-gray-500">{currentIndex + 1} / {questions.length}</span>
-            <div className="w-5" />
-          </div>
-
-          {/* 正誤 */}
-          <div className={`rounded-2xl p-4 mb-4 flex items-center gap-3 ${isCorrect ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
-            {isCorrect
-              ? <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
-              : <XCircle className="w-6 h-6 text-red-600 flex-shrink-0" />}
-            <p className={`font-bold ${isCorrect ? "text-green-700" : "text-red-700"}`}>
-              {isCorrect ? "正解！" : "不正解"}
-            </p>
-          </div>
-
-          {/* 選択肢 */}
-          <div className="bg-white rounded-2xl shadow p-5 mb-4">
-            <p className="text-xs font-semibold text-gray-400 mb-3">問題 {q.id}：{q.title}</p>
-            <p className="text-sm text-gray-700 mb-4 whitespace-pre-line leading-relaxed">{q.question}</p>
-            <div className="space-y-2">
-              {q.choices.map((choice, idx) => {
-                let cls = "bg-gray-50 text-gray-600";
-                if (idx === q.answer) cls = "bg-green-100 text-green-800 border border-green-400";
-                else if (idx === selected && idx !== q.answer) cls = "bg-red-100 text-red-800 border border-red-300";
-                return (
-                  <div key={idx} className={`rounded-xl px-4 py-3 text-sm ${cls}`}>
-                    <span className="font-bold mr-2">{["ア", "イ", "ウ", "エ"][idx]}</span>
-                    {choice}
-                    {idx === q.answer && <span className="ml-2 text-xs font-bold text-green-700">← 正解</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 解説 */}
-          <div className="bg-white rounded-2xl shadow p-5 mb-4">
-            <p className="text-xs font-semibold text-gray-400 mb-2">解説</p>
-            <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{q.explanation}</p>
-          </div>
-
-          {/* 要復習 */}
-          <button
-            onClick={() => toggleReview(q.id)}
-            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl mb-4 font-medium text-sm border-2 transition-all ${
-              isReview
-                ? "bg-yellow-50 border-yellow-400 text-yellow-700"
-                : "bg-white border-gray-200 text-gray-500 hover:border-yellow-300"
-            }`}
-          >
-            <Flag className="w-4 h-4" />
-            {isReview ? "要復習を解除" : "要復習に追加"}
-          </button>
-
-          <button
-            onClick={goNext}
-            className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
-          >
-            {currentIndex + 1 >= questions.length ? "結果を見る" : "次の問題"}
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 結果画面
-  if (screen === "results") {
-    const correct = sessionResults.filter(r => r.correct).length;
-    const total = sessionResults.length;
-    const pct = Math.round((correct / total) * 100);
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-lg w-full">
-          <div className="bg-white rounded-2xl shadow p-8 text-center mb-4">
-            <p className="text-5xl font-bold text-blue-600 mb-2">{pct}%</p>
-            <p className="text-gray-500 text-sm mb-4">{total}問中 {correct}問正解</p>
-            <div className="w-full bg-gray-200 rounded-full h-3 mb-6">
-              <div className="bg-blue-500 h-3 rounded-full" style={{ width: `${pct}%` }}></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {sessionResults.map((r, i) => {
-                const q = ALL_QUESTIONS.find(q => q.id === r.id);
-                return (
-                  <div key={i} className={`rounded-xl p-3 text-left ${r.correct ? "bg-green-50" : "bg-red-50"}`}>
-                    <p className="text-xs font-bold text-gray-500">Q{r.id}</p>
-                    <p className="text-xs text-gray-700 truncate">{q?.title}</p>
-                    <p className={`text-xs font-bold mt-1 ${r.correct ? "text-green-600" : "text-red-600"}`}>
-                      {r.correct ? "✓ 正解" : "✗ 不正解"}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <button
-            onClick={() => setScreen("home")}
-            className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
-          >
+      <div className="max-w-2xl mx-auto p-4 min-h-screen bg-slate-50">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-xl font-bold text-slate-800 flex items-center">
+            <Save className="w-5 h-5 mr-2" /> 学習履歴
+          </h1>
+          <button onClick={() => setView('home')} className="p-2 text-slate-500 hover:bg-slate-200 rounded-full">
             <Home className="w-5 h-5" />
-            ホームに戻る
           </button>
         </div>
-      </div>
-    );
-  }
 
-  // 履歴画面
-  if (screen === "history") {
-    return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-lg mx-auto">
-          <div className="flex items-center gap-3 mb-6">
-            <button onClick={() => setScreen("home")} className="text-gray-400 hover:text-gray-600">
-              <Home className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-bold text-gray-800">履歴一覧</h2>
+        {/* Charts */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col sm:flex-row items-center">
+          <div className="w-full sm:w-1/2 h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
-          <div className="space-y-2">
-            {ALL_QUESTIONS.map(q => {
-              const h = history[q.id];
-              return (
-                <div key={q.id} className="bg-white rounded-xl shadow px-4 py-3 flex items-center gap-3">
-                  <span className="text-xs text-gray-400 w-6">Q{q.id}</span>
-                  <span className="text-sm text-gray-700 flex-1">{q.title}</span>
-                  <div className="flex items-center gap-2">
-                    {h?.review && (
-                      <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">要復習</span>
-                    )}
-                    {h ? (
-                      h.correct
-                        ? <CheckCircle className="w-5 h-5 text-green-500" />
-                        : <XCircle className="w-5 h-5 text-red-500" />
-                    ) : (
-                      <span className="text-xs text-gray-300">未回答</span>
-                    )}
-                    <button
-                      onClick={() => toggleReview(q.id)}
-                      className={`p-1 rounded-full transition-colors ${h?.review ? "text-yellow-500" : "text-gray-300 hover:text-yellow-400"}`}
-                    >
-                      <Flag className="w-4 h-4" />
-                    </button>
+          <div className="w-full sm:w-1/2 mt-4 sm:mt-0 sm:pl-6 space-y-3">
+            <div className="flex justify-between items-center bg-slate-50 p-3 rounded">
+              <span className="text-sm font-medium text-slate-600">全問題数</span>
+              <span className="font-bold text-slate-800">{quizData.length} 問</span>
+            </div>
+            <div className="flex justify-between items-center bg-green-50 p-3 rounded">
+              <span className="text-sm font-medium text-green-700">解答済 (正解)</span>
+              <span className="font-bold text-green-700">{stats.correct} 問</span>
+            </div>
+            <div className="flex justify-between items-center bg-red-50 p-3 rounded">
+              <span className="text-sm font-medium text-red-700">解答済 (不正解)</span>
+              <span className="font-bold text-red-700">{stats.wrong} 問</span>
+            </div>
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="space-y-3">
+          <h2 className="font-bold text-slate-700 mb-3 px-1">問題別の状況</h2>
+          {quizData.map(q => {
+            const h = userData.history[q.id];
+            const r = userData.review[q.id];
+            
+            let statusIcon = <div className="w-6 h-6 rounded-full bg-slate-200"></div>;
+            if (h?.status === 'correct') statusIcon = <Check className="w-6 h-6 text-green-500" />;
+            if (h?.status === 'wrong') statusIcon = <X className="w-6 h-6 text-red-500" />;
+
+            return (
+              <div key={q.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center">
+                <div className="mr-4 flex-shrink-0">
+                  {statusIcon}
+                </div>
+                <div className="flex-grow">
+                  <div className="flex items-center">
+                    <span className="text-xs font-bold text-slate-400 mr-2">Q{q.id}</span>
+                    <span className="font-bold text-slate-800 text-sm line-clamp-1">{q.title}</span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-          <button
-            onClick={resetHistory}
-            className="w-full mt-6 bg-red-50 text-red-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-            履歴をリセット
-          </button>
+                <div className="ml-4 flex-shrink-0">
+                  <button 
+                    onClick={() => toggleReviewFlag(q.id)}
+                    className={`px-3 py-1 text-xs font-bold rounded-full border transition ${r ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`}
+                  >
+                    {r ? '要復習' : '復習に追加'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
